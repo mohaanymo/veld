@@ -9,10 +9,10 @@ import (
 	"strings"
 	"syscall"
 
-	"veld/internal/config"
-	"veld/internal/engine"
-	"veld/internal/parser"
-	"veld/internal/tui"
+	"github.com/mohaanymo/veld/internal/config"
+	"github.com/mohaanymo/veld/internal/engine"
+	"github.com/mohaanymo/veld/internal/parser"
+	"github.com/mohaanymo/veld/internal/tui"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -99,7 +99,6 @@ func parseFlags() *config.Config {
 			cfg.Headers[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
 		}
 	}
-
 	return cfg
 }
 

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"veld/internal/models"
+	"github.com/mohaanymo/veld/internal/models"
 )
 
 // DASHParser parses DASH (mpd) manifests.

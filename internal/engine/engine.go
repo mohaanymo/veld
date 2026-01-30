@@ -10,9 +10,10 @@ import (
 	"net/http"
 	"time"
 
-	"veld/internal/config"
-	"veld/internal/models"
-	"veld/internal/parser"
+	"github.com/mohaanymo/veld/internal/config"
+	"github.com/mohaanymo/veld/internal/decryptor"
+	"github.com/mohaanymo/veld/internal/models"
+	"github.com/mohaanymo/veld/internal/parser"
 )
 
 // Engine is the main download orchestrator.
@@ -26,7 +27,7 @@ type Engine struct {
 	SelectedTracks []*models.Track
 
 	// Pluggable interfaces
-	decryptor Decryptor
+	decryptor *decryptor.Decryptor
 	muxer     Muxer
 }
 
@@ -35,11 +36,20 @@ func New(cfg *config.Config) (*Engine, error) {
 	client := newOptimizedClient()
 	progressCh := make(chan ProgressUpdate, 100)
 
+	var dec *decryptor.Decryptor
+	if cfg.DecryptionKey != "" {
+		d, err := decryptor.New(cfg.DecryptionKey)
+		if err != nil {
+			return nil, err
+		}
+		dec = d
+	}
+
 	e := &Engine{
 		cfg:        cfg,
 		client:     client,
 		progressCh: progressCh,
-		decryptor:  &NoOpDecryptor{},
+		decryptor:  dec,
 		muxer:      NewAutoMuxer(cfg),
 	}
 
@@ -150,8 +160,8 @@ func (e *Engine) Download(ctx context.Context, manifest *models.Manifest) error 
 	}
 
 	// Decrypt segments if needed
-	for _, track := range e.SelectedTracks {
-		if track.Encrypted {
+	if e.decryptor != nil {
+		for _, track := range e.SelectedTracks {
 			if err := e.decryptTrack(track); err != nil {
 				return err
 			}
@@ -164,17 +174,16 @@ func (e *Engine) Download(ctx context.Context, manifest *models.Manifest) error 
 
 // decryptTrack decrypts all segments in a track.
 func (e *Engine) decryptTrack(track *models.Track) error {
-	if !e.decryptor.CanDecrypt("") {
+	if e.decryptor == nil {
 		return nil
 	}
 
-	key, iv, err := e.decryptor.ParseKey(e.cfg.DecryptionKey)
-	if err != nil {
-		return err
-	}
-
 	for _, segment := range track.Segments {
-		decrypted, err := e.decryptor.Decrypt(segment.Data, key, iv)
+		// Combine init + segment
+		combined := make([]byte, len(track.InitSegment.Data)+len(segment.Data))
+		copy(combined, track.InitSegment.Data)
+		copy(combined[len(track.InitSegment.Data):], segment.Data)
+		decrypted, err := e.decryptor.Decrypt(combined)
 		if err != nil {
 			return err
 		}
@@ -193,11 +202,6 @@ func (e *Engine) Progress() <-chan ProgressUpdate {
 func (e *Engine) Close() error {
 	close(e.progressCh)
 	return nil
-}
-
-// SetDecryptor sets a custom decryptor implementation.
-func (e *Engine) SetDecryptor(d Decryptor) {
-	e.decryptor = d
 }
 
 // SetMuxer sets a custom muxer implementation.

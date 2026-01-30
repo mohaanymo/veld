@@ -1,8 +1,11 @@
-module veld
+module github.com/mohaanymo/veld
 
 go 1.22
 
-require github.com/charmbracelet/bubbletea v1.2.4
+require (
+	github.com/Eyevinn/mp4ff v0.50.0
+	github.com/charmbracelet/bubbletea v1.2.4
+)
 
 require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect

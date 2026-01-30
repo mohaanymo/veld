@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"veld/internal/models"
+	"github.com/mohaanymo/veld/internal/models"
 )
 
 // SegmentTask represents a download task for the worker pool.

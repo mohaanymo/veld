@@ -3,7 +3,7 @@ package engine
 import (
 	"context"
 
-	"veld/internal/models"
+	"github.com/mohaanymo/veld/internal/models"
 )
 
 // ProgressUpdate represents a download progress update.

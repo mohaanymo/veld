@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"veld/internal/models"
+	"github.com/mohaanymo/veld/internal/models"
 )
 
 // Parser defines the interface for manifest parsers.
