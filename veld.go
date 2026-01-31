@@ -239,6 +239,11 @@ func (d *Downloader) Close() error {
 	return d.eng.Close()
 }
 
+// getSelectedTracksInternal returns internal track models (for manager use).
+func (d *Downloader) getSelectedTracksInternal() interface{} {
+	return d.eng.SelectedTracks
+}
+
 // ManifestType returns the type of manifest ("HLS" or "DASH").
 // Returns empty string if Parse() hasn't been called.
 func (d *Downloader) ManifestType() string {
