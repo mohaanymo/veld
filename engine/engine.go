@@ -10,10 +10,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/mohaanymo/veld/internal/config"
-	"github.com/mohaanymo/veld/internal/decryptor"
-	"github.com/mohaanymo/veld/internal/models"
-	"github.com/mohaanymo/veld/internal/parser"
+	"github.com/mohaanymo/veld/config"
+	"github.com/mohaanymo/veld/decryptor"
+	"github.com/mohaanymo/veld/models"
+	"github.com/mohaanymo/veld/parser"
 )
 
 // Engine is the main download orchestrator.

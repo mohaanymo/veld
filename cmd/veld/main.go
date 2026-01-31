@@ -9,10 +9,10 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/mohaanymo/veld/internal/config"
-	"github.com/mohaanymo/veld/internal/engine"
-	"github.com/mohaanymo/veld/internal/parser"
-	"github.com/mohaanymo/veld/internal/tui"
+	"github.com/mohaanymo/veld/config"
+	"github.com/mohaanymo/veld/engine"
+	"github.com/mohaanymo/veld/parser"
+	"github.com/mohaanymo/veld/tui"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

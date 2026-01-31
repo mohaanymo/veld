@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mohaanymo/veld/internal/models"
+	"github.com/mohaanymo/veld/models"
 )
 
 // HLSParser parses HLS (m3u8) manifests.

@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mohaanymo/veld/internal/models"
+	"github.com/mohaanymo/veld/models"
 )
 
 // TrackSelector provides smart track selection from a list of tracks.
