@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mohaanymo/veld/config"
-	"github.com/mohaanymo/veld/models"
+	"github.com/mohaanymo/veld/internal/config"
+	"github.com/mohaanymo/veld/internal/models"
 )
 
 // AutoMuxer automatically selects the best muxer based on availability.

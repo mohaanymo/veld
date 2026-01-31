@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mohaanymo/veld/config"
-	"github.com/mohaanymo/veld/engine"
-	"github.com/mohaanymo/veld/models"
+	"github.com/mohaanymo/veld/internal/config"
+	"github.com/mohaanymo/veld/internal/engine"
+	"github.com/mohaanymo/veld/internal/models"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

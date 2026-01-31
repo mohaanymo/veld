@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mohaanymo/veld/models"
+	"github.com/mohaanymo/veld/internal/models"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
