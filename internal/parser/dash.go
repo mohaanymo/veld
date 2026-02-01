@@ -179,7 +179,7 @@ func (p *DASHParser) convertMPD(mpd *MPD, baseURL *url.URL) (*models.Manifest, e
 				}
 
 				if tmpl != nil {
-					track.Segments, track.InitSegment = p.buildSegmentsFromTemplate(tmpl, rep, repBase)
+					track.Segments, track.InitSegment = p.buildSegmentsFromTemplate(tmpl, rep, repBase, manifest.Duration)
 				} else if rep.SegmentList != nil {
 					track.Segments, track.InitSegment = p.buildSegmentsFromList(rep.SegmentList, repBase)
 				} else if rep.BaseURL != "" {
@@ -199,7 +199,7 @@ func (p *DASHParser) convertMPD(mpd *MPD, baseURL *url.URL) (*models.Manifest, e
 }
 
 // buildSegmentsFromTemplate generates segments from a template.
-func (p *DASHParser) buildSegmentsFromTemplate(tmpl *SegmentTemplate, rep Representation, base *url.URL) ([]*models.Segment, *models.Segment) {
+func (p *DASHParser) buildSegmentsFromTemplate(tmpl *SegmentTemplate, rep Representation, base *url.URL, totalDuration time.Duration) ([]*models.Segment, *models.Segment) {
 	var segments []*models.Segment
 	var initSeg *models.Segment
 
@@ -245,15 +245,19 @@ func (p *DASHParser) buildSegmentsFromTemplate(tmpl *SegmentTemplate, rep Repres
 			}
 		}
 	} else if tmpl.Duration > 0 {
-		// Fixed duration segments - default to 100 segments
-		numSegments := 100
+		// Calculate segment count from manifest duration
+		segmentDuration := time.Duration(tmpl.Duration) * time.Second / time.Duration(timescale)
+		numSegments := 1
+		if totalDuration > 0 && segmentDuration > 0 {
+			numSegments = int(totalDuration/segmentDuration) + 1
+		}
 		for i := 0; i < numSegments; i++ {
 			segNum := tmpl.StartNumber + i
 			mediaURL := expandTemplate(tmpl.Media, rep.ID, segNum, 0)
 			seg := &models.Segment{
 				Index:    i,
 				URL:      resolveURL(base, mediaURL),
-				Duration: time.Duration(tmpl.Duration) * time.Second / time.Duration(timescale),
+				Duration: segmentDuration,
 			}
 			segments = append(segments, seg)
 		}
