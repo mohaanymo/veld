@@ -264,7 +264,7 @@ func (m *managerModel) View() string {
 }
 
 func (m *managerModel) viewHeader(w int) string {
-	title := uiTitleStyle.Render("⚡ veld")
+	title := uiTitleStyle.Render(m.manager.title)
 	subtitle := uiDimStyle.Render(" - Download Manager")
 
 	stats := m.manager.Stats()

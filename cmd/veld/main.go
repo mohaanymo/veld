@@ -58,12 +58,12 @@ func parseFlags() *config.Config {
 
 	var headers headerFlags
 	var threads int
-
+	var keyStr string
 	// Core options
 	flag.StringVar(&cfg.URL, "url", "", "")
 	flag.StringVar(&cfg.URL, "u", "", "")
-	flag.StringVar(&cfg.OutputPath, "output", "", "")
-	flag.StringVar(&cfg.OutputPath, "o", "", "")
+	flag.StringVar(&cfg.FileName, "filename", "", "")
+	flag.StringVar(&cfg.FileName, "fn", "", "")
 	flag.IntVar(&threads, "threads", config.DefaultThreads, "")
 	flag.IntVar(&threads, "n", config.DefaultThreads, "")
 	flag.BoolVar(&cfg.ParallelTracks, "parallel-tracks", false, "")
@@ -71,7 +71,7 @@ func parseFlags() *config.Config {
 	flag.Var(&headers, "header", "")
 	flag.Var(&headers, "H", "")
 	flag.StringVar(&cfg.Cookies, "cookie", "", "")
-	flag.StringVar(&cfg.DecryptionKey, "key", "", "")
+	flag.StringVar(&keyStr, "key", "", "comma-separated keys")
 	flag.StringVar(&cfg.TrackSelector, "select-track", "", "")
 	flag.StringVar(&cfg.TrackSelector, "s", "", "")
 	flag.StringVar(&cfg.Format, "format", config.DefaultFormat, "")
@@ -85,6 +85,7 @@ func parseFlags() *config.Config {
 	flag.Usage = printUsage
 	flag.Parse()
 
+	cfg.DecryptionKeys = strings.Split(keyStr, ",")
 	cfg.Threads = threads
 
 	// If no track selector provided, show interactive picker
@@ -116,7 +117,7 @@ Options:
   -f, --format <fmt>        Output format: mp4, mkv, ts (default: mp4)
   -H, --header <header>     Custom header (repeatable)
       --cookie <cookies>    Cookies for requests
-      --key <KID:KEY>       Decryption key
+      --key <KID:KEY>       Decryption key (KID:KEY,KID:KEY)
       --muxer <backend>     Muxer: auto, ffmpeg, binary (default: auto)
       --no-progress         Disable TUI progress
   -v, --verbose             Verbose output
@@ -198,7 +199,7 @@ func run(ctx context.Context, cfg *config.Config) error {
 		if err != nil {
 			return err
 		}
-		printOutputPath(cfg)
+		printFileName(cfg)
 		return nil
 	}
 
@@ -224,19 +225,19 @@ func run(ctx context.Context, cfg *config.Config) error {
 		return downloadErr
 	}
 
-	printOutputPath(cfg)
+	printFileName(cfg)
 	return nil
 }
 
-func printOutputPath(cfg *config.Config) {
-	output := cfg.OutputPath
-	if output == "" {
-		output = "output"
+func printFileName(cfg *config.Config) {
+	filename := cfg.FileName
+	if filename == "" {
+		filename = "filename"
 	}
-	if !strings.HasSuffix(strings.ToLower(output), "."+cfg.Format) {
-		output = output + "." + cfg.Format
+	if !strings.HasSuffix(strings.ToLower(filename), "."+cfg.Format) {
+		filename = filename + "." + cfg.Format
 	}
-	fmt.Printf("\n✓ Saved to: %s\n", output)
+	fmt.Printf("\n✓ Saved to: %s\n", filename)
 }
 
 // headerFlags implements flag.Value for repeatable header flags

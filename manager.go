@@ -46,7 +46,7 @@ func (s TaskState) String() string {
 type Task struct {
 	ID            string
 	URL           string
-	OutputPath    string
+	FileName    string
 	Options       []Option
 	State         TaskState
 	Error         error
@@ -84,6 +84,7 @@ func (p TaskProgress) Percent() float64 {
 
 // Manager handles queued downloads with concurrency control.
 type Manager struct {
+	title string
 	maxConcurrent int
 	tasks         sync.Map // map[string]*Task
 	taskOrder     []string
@@ -110,6 +111,13 @@ type Manager struct {
 
 // ManagerOption configures the Manager.
 type ManagerOption func(*Manager)
+
+// WithTitle sets the dowmloader manger title.
+func WithTitle(t string) ManagerOption {
+	return func(m *Manager) {
+		m.title = t
+	}
+}
 
 // WithMaxConcurrent sets the maximum number of concurrent downloads.
 func WithMaxConcurrent(n int) ManagerOption {
@@ -218,7 +226,7 @@ func (m *Manager) worker() {
 }
 
 // AddTask adds a new download task to the queue.
-func (m *Manager) AddTask(id, url, output string, opts ...Option) (*Task, error) {
+func (m *Manager) AddTask(id, url, filename string, opts ...Option) (*Task, error) {
 	if !m.running.Load() {
 		return nil, fmt.Errorf("manager not started, call Start() first")
 	}
@@ -234,7 +242,7 @@ func (m *Manager) AddTask(id, url, output string, opts ...Option) (*Task, error)
 	task := &Task{
 		ID:         id,
 		URL:        url,
-		OutputPath: output,
+		FileName: filename,
 		Options:    allOpts,
 		State:      TaskPending,
 		CreatedAt:  time.Now(),
@@ -404,7 +412,7 @@ func (m *Manager) processTask(task *Task) {
 	// Create downloader with task options
 	opts := append([]Option{
 		WithURL(task.URL),
-		WithOutput(task.OutputPath),
+		WithFileName(task.FileName),
 	}, task.Options...)
 
 	d, err := New(opts...)
