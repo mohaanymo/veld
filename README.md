@@ -1,170 +1,328 @@
-# veld
-
-[![Go Version](https://img.shields.io/badge/Go-1.22+-00ADD8?style=flat&logo=go)](https://go.dev)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-
-**veld** (Video Element Downloader) is a blazing-fast, concurrent HLS/DASH media downloader written in Go. Download videos from streaming platforms with ease using a beautiful terminal UI.
-
 <p align="center">
-  <img src="https://via.placeholder.com/800x400?text=veld+demo" alt="veld demo" />
+  <img src="assets/logo.png" alt="Veld Logo" width="400" />
 </p>
 
-## ✨ Features
+<h1 align="center">Veld - HLS & DASH Video Downloader</h1>
 
-- 🚀 **Blazing Fast** - Concurrent segment downloads with up to 128 threads
-- 📺 **HLS & DASH** - Full support for m3u8 and mpd manifests
-- 🎬 **Multi-track** - Download video, audio, and subtitle tracks separately or together
-- 🎨 **Beautiful TUI** - Interactive track picker with real-time progress
-- 🔧 **Smart Muxing** - Automatically combines tracks into MP4, MKV, or TS
-- ⚡ **HTTP/2** - Connection pooling and multiplexing for maximum speed
-- 🔐 **Encryption Ready** - Pluggable decryption for protected streams
-- 🌍 **Cross-Platform** - Linux, macOS, and Windows
+<p align="center">
+  <strong>The fastest open-source streaming video downloader for HLS and DASH</strong>
+</p>
 
-## 📦 Installation
+<p align="center">
+  <a href="https://github.com/mohaanymo/veld/releases"><img src="https://img.shields.io/github/v/release/mohaanymo/veld?style=flat-square&color=00ADD8" alt="Release"></a>
+  <a href="https://go.dev"><img src="https://img.shields.io/badge/Go-1.22+-00ADD8?style=flat-square&logo=go&logoColor=white" alt="Go Version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License"></a>
+  <a href="https://github.com/mohaanymo/veld/stargazers"><img src="https://img.shields.io/github/stars/mohaanymo/veld?style=flat-square&color=yellow" alt="Stars"></a>
+</p>
 
-### Pre-built Binaries
+<p align="center">
+  <a href="#-installation">Installation</a> •
+  <a href="#-quick-start">Quick Start</a> •
+  <a href="#-features">Features</a> •
+  <a href="#-track-selection">Track Selection</a> •
+  <a href="#-library-usage">Library Usage</a>
+</p>
 
-Download from [Releases](https://github.com/yourusername/veld/releases)
+---
 
-### Go Install
+## What is Veld?
+
+**Veld** is a high-performance command-line tool and Go library for downloading HLS (m3u8) and DASH (mpd) video streams. Whether you're archiving live streams, downloading VOD content, or building video applications, Veld makes it fast and easy.
+
+### Why Choose Veld?
+
+| Feature | Veld | yt-dlp | N_m3u8DL-RE |
+|---------|:----:|:------:|:-----------:|
+| Concurrent downloads | ✅ 128 threads | ❌ | ✅ |
+| Resume interrupted downloads | ✅ | ❌ | ✅ |
+| Interactive track picker | ✅ | ❌ | ❌ |
+| Rate limiting | ✅ | ✅ | ❌ |
+| Go library API | ✅ | ❌ | ❌ |
+| Memory efficient (disk-based) | ✅ | ✅ | ❌ |
+| HLS AES-128 decryption | ✅ | ✅ | ✅ |
+| DASH CENC decryption | ✅ | ❌ | ✅ |
+
+---
+
+## 🚀 Installation
+
+### Download Binary
+
+Grab the latest release for your platform:
 
 ```bash
-go install github.com/yourusername/veld/cmd/veld@latest
+# Linux
+curl -L https://github.com/mohaanymo/veld/releases/latest/download/veld-linux-amd64 -o veld
+chmod +x veld
+sudo mv veld /usr/local/bin/
+
+# macOS
+brew install mohaanymo/tap/veld
+
+# Windows
+# Download veld.exe from Releases page
+```
+
+### Install with Go
+
+```bash
+go install github.com/mohaanymo/veld/cmd/veld@latest
 ```
 
 ### Build from Source
 
 ```bash
-git clone https://github.com/yourusername/veld.git
+git clone https://github.com/mohaanymo/veld.git
 cd veld
 go build -o veld ./cmd/veld
 ```
 
-## 🚀 Quick Start
+---
+
+## ⚡ Quick Start
+
+### Download a Video (Interactive)
 
 ```bash
-# Interactive mode - pick tracks visually
-veld -u https://example.com/stream.m3u8
-
-# Auto-select best quality
-veld -u https://example.com/stream.m3u8 -s best
-
-# Download 1080p video
-veld -u https://example.com/stream.m3u8 -s 1080p -o movie.mp4
-
-# DASH manifest
-veld -u https://example.com/stream.mpd -s best
+veld -u "https://example.com/video.m3u8"
 ```
 
-## 📖 Usage
+This opens an interactive picker to choose video quality, audio tracks, and subtitles.
 
-```
-veld - Video Element Downloader
+### Download Best Quality Automatically
 
-Usage: veld [options] -u <URL>
-
-Options:
-  -u, --url <URL>           Stream URL (m3u8/mpd) [required]
-  -o, --output <path>       Output file (default: output.mp4)
-  -n, --threads <num>       Concurrent downloads (default: 16)
-  -s, --select-track <sel>  Track selection (omit for picker)
-  -f, --format <fmt>        Output: mp4, mkv, ts (default: mp4)
-  -H, --header <header>     Custom header (repeatable)
-      --cookie <cookies>    Cookies for auth
-      --key <KID:KEY>       Decryption key
-      --no-progress         Disable TUI
-  -v, --verbose             Verbose output
-      --version             Show version
+```bash
+veld -u "https://example.com/video.m3u8" -s best -fn movie.mp4
 ```
 
-### Track Selection
+### Download with Limited Bandwidth
+
+```bash
+veld -u "https://example.com/video.m3u8" -s best --max-bandwidth 2M
+```
+
+---
+
+## ✨ Features
+
+### 🎯 Smart Track Selection
+
+Veld has the most powerful track selector of any streaming downloader:
+
+```bash
+# Resolution ranges
+veld -u URL -s "720p-1080p"           # Between 720p and 1080p
+veld -u URL -s "-720p"                # Best up to 720p
+
+# Multiple audio languages
+veld -u URL -s "v:best + a:en,es,fr"  # Video + 3 audio tracks
+
+# Bandwidth filtering
+veld -u URL -s "a:[128k-256k]"        # Audio 128-256 kbps
+
+# Modifiers
+veld -u URL -s "s:en!"                # English subs (required, fail if missing)
+veld -u URL -s "a:?*"                 # All audio including undefined language
+```
+
+### 💾 Resume Downloads
+
+Downloads automatically resume if interrupted:
+
+```bash
+veld -u "https://example.com/video.m3u8" -s best
+# Downloads 60%... connection drops
+
+veld -u "https://example.com/video.m3u8" -s best
+# ✓ Resuming: skipped 180/300 segments
+```
+
+### 🔐 Encrypted Streams
+
+```bash
+# HLS with AES-128 (key auto-fetched from manifest)
+veld -u "https://example.com/encrypted.m3u8" -s best
+
+# DASH with CENC (provide key manually)
+veld -u "https://example.com/drm.mpd" -s best --key "KID:KEY"
+```
+
+### 🎨 Beautiful Terminal UI
+
+<p align="center">
+  <img src="https://via.placeholder.com/700x400?text=TUI+Screenshot" alt="Terminal UI" />
+</p>
+
+---
+
+## 📖 Track Selection
+
+### Basic Selectors
 
 | Selector | Description |
 |----------|-------------|
 | `best` | Best video + best audio |
-| `all` | All available tracks |
+| `all` | All tracks |
 | `1080p` `720p` `480p` | By resolution |
 | `4k` `hd` `sd` | Quality presets |
-| `video:0+audio:1` | By index |
-| `en` `es` `ja` | Audio by language |
 
-## 💡 Examples
+### Advanced Selectors
 
-### With Authentication Headers
+| Selector | Description |
+|----------|-------------|
+| `v:best + a:en + s:en` | Video + English audio + English subs |
+| `v:-1080p` | Best video up to 1080p |
+| `a:en,es,fr*` | All English, Spanish, French audio |
+| `v:0 + a:1` | By index (first video, second audio) |
+| `a:[>128k]` | Audio above 128kbps |
 
-```bash
-veld -u https://example.com/stream.m3u8 \
-    -H "Authorization: Bearer eyJ..." \
-    -H "Referer: https://example.com"
+### Modifiers
+
+| Modifier | Meaning |
+|----------|---------|
+| `!` | Required (fail if not found) |
+| `?` | Include undefined/unknown language |
+| `*` | Select all matching tracks |
+
+---
+
+## 📚 Library Usage
+
+Use Veld as a Go library in your applications:
+
+```go
+package main
+
+import (
+    "context"
+    "log"
+    
+    "github.com/mohaanymo/veld"
+)
+
+func main() {
+    d, err := veld.New(
+        veld.WithURL("https://example.com/video.m3u8"),
+        veld.WithFileName("output.mp4"),
+        veld.WithTrackSelector("best"),
+        veld.WithMaxBandwidth(5*1024*1024), // 5 MB/s limit
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer d.Close()
+
+    ctx := context.Background()
+    
+    // Parse manifest
+    if err := d.Parse(ctx); err != nil {
+        log.Fatal(err)
+    }
+    
+    // Select tracks
+    if err := d.SelectTracks(); err != nil {
+        log.Fatal(err)
+    }
+    
+    // Download
+    if err := d.Download(ctx); err != nil {
+        log.Fatal(err)
+    }
+}
 ```
 
-### Download Everything
+### Available Options
 
-```bash
-veld -u https://example.com/stream.m3u8 -s all -o complete.mkv
+```go
+veld.WithURL(url string)                    // Stream URL (required)
+veld.WithFileName(name string)              // Output filename
+veld.WithOutputDir(dir string)              // Output directory
+veld.WithFormat(fmt string)                 // mp4, mkv, ts
+veld.WithThreads(n int)                     // Concurrent downloads (1-128)
+veld.WithTrackSelector(sel string)          // Track selection expression
+veld.WithHeaders(h map[string]string)       // Custom HTTP headers
+veld.WithDecryptionKeys(keys []string)      // KID:KEY pairs
+veld.WithMaxBandwidth(bps int64)            // Rate limit in bytes/sec
+veld.WithVerbose(v bool)                    // Enable verbose logging
 ```
 
-### Maximum Speed
+---
 
-```bash
-veld -u https://example.com/stream.m3u8 -n 64 -s best
+## ⚙️ CLI Reference
+
+```
+veld - High-performance HLS/DASH video downloader
+
+Usage: veld [options] -u <URL>
+
+Options:
+  -u, --url <URL>           Stream URL (m3u8 or mpd) [required]
+  -fn, --filename <name>    Output filename
+  -n, --threads <num>       Concurrent downloads (default: 16, max: 128)
+  -s, --select-track <sel>  Track selection (omit for interactive picker)
+  -P, --parallel-tracks     Download all tracks in parallel
+  -f, --format <fmt>        Output format: mp4, mkv, ts (default: mp4)
+  -H, --header <header>     Custom HTTP header (can repeat)
+      --cookie <cookies>    Cookies for authenticated requests
+      --key <KID:KEY>       Decryption key(s), comma-separated
+      --muxer <backend>     Muxer: auto, ffmpeg, binary (default: auto)
+      --no-progress         Disable TUI, output to stdout
+  -v, --verbose             Verbose output
+      --version             Show version
 ```
 
-### Scripting (No TUI)
-
-```bash
-veld -u https://example.com/stream.m3u8 -s best --no-progress
-```
-
-## ⚡ Performance
-
-veld is optimized for speed with:
-- HTTP/2 multiplexing
-- Connection pooling (100 connections per host)
-- Zero-copy streaming where possible
-- Efficient memory usage with buffer pools
-
-| Tool | 1GB Stream |
-|------|-----------|
-| **veld** | ~45s |
-| wget | ~120s |
-| aria2c | ~60s |
-| N_m3u8DL-RE | ~50s |
-
-*Results vary by network and server.*
+---
 
 ## 🔧 Requirements
 
-- **FFmpeg** (recommended) - Required for muxing multiple tracks into MP4/MKV
+- **FFmpeg** (optional but recommended) - Required for muxing to MP4/MKV with multiple tracks
 
-## 🏗️ Architecture
+---
 
-```
-veld/
-├── cmd/veld/         # CLI
-└── internal/
-    ├── config/       # Configuration
-    ├── engine/       # Download engine
-    ├── models/       # Data types
-    ├── parser/       # HLS/DASH parsers
-    └── tui/          # Terminal UI
-```
+## 📈 Performance
+
+Veld is optimized for maximum throughput:
+
+- ✅ HTTP/2 multiplexing
+- ✅ Connection pooling (100+ connections per host)
+- ✅ Disk-based segment storage (low memory usage)
+- ✅ Concurrent track downloads
+
+Typical speeds on a 100 Mbps connection:
+
+| File Size | Time |
+|-----------|------|
+| 500 MB | ~40s |
+| 1 GB | ~80s |
+| 5 GB | ~7 min |
+
+---
 
 ## 🤝 Contributing
 
-Contributions welcome! Please:
+Contributions are welcome! Here's how:
 
-1. Fork the repo
-2. Create a feature branch
-3. Make your changes
-4. Submit a PR
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing`)
+5. Open a Pull Request
+
+---
 
 ## 📄 License
 
-MIT License - see [LICENSE](LICENSE)
+MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
 <p align="center">
-  <b>veld</b> - Fast. Simple. Beautiful.
+  <b>Veld</b> - Fast. Resumable. Beautiful.<br>
+  <sub>Made with ❤️ in Go</sub>
 </p>
+
+---
+
+## 🏷️ Keywords
+
+`hls-downloader` `dash-downloader` `m3u8-downloader` `mpd-downloader` `video-downloader` `streaming-downloader` `go` `golang` `cli` `terminal` `ffmpeg` `media-downloader` `vod-downloader` `live-stream-downloader` `concurrent-downloader` `resumable-downloads`
