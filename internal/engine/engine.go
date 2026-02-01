@@ -3,15 +3,16 @@ package engine
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
-	"time"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/mohaanymo/veld/internal/config"
 	"github.com/mohaanymo/veld/internal/decryptor"
+	"github.com/mohaanymo/veld/internal/httpclient"
 	"github.com/mohaanymo/veld/internal/models"
 	"github.com/mohaanymo/veld/internal/parser"
 )
@@ -26,30 +27,30 @@ type Engine struct {
 	// Selected tracks (set after selection)
 	SelectedTracks []*models.Track
 
+	// Resume support
+	checkpoint     *Checkpoint
+	checkpointPath string
+
 	// Pluggable interfaces
-	decryptor *decryptor.Decryptor
-	muxer     Muxer
+	muxer Muxer
 }
 
 // New creates a new Engine with optimized settings.
 func New(cfg *config.Config) (*Engine, error) {
-	client := newOptimizedClient()
-	progressCh := make(chan ProgressUpdate, 100)
-
-	var dec *decryptor.Decryptor
-	if cfg.DecryptionKey != "" {
-		d, err := decryptor.New(cfg.DecryptionKey)
-		if err != nil {
-			return nil, err
-		}
-		dec = d
+	// Use shared HTTP client with optional rate limiting
+	var client *http.Client
+	if cfg.MaxBandwidth > 0 {
+		client = httpclient.NewWithRateLimit(httpclient.DefaultConfig(), cfg.MaxBandwidth)
+	} else {
+		client = httpclient.New(httpclient.DefaultConfig())
 	}
+
+	progressCh := make(chan ProgressUpdate, 100)
 
 	e := &Engine{
 		cfg:        cfg,
 		client:     client,
 		progressCh: progressCh,
-		decryptor:  dec,
 		muxer:      NewAutoMuxer(cfg),
 	}
 
@@ -59,50 +60,29 @@ func New(cfg *config.Config) (*Engine, error) {
 	return e, nil
 }
 
-// newOptimizedClient creates a heavily tuned HTTP client for maximum throughput.
-func newOptimizedClient() *http.Client {
-	dialer := &net.Dialer{
-		Timeout:   30 * time.Second,
-		KeepAlive: 30 * time.Second,
-		DualStack: true,
-	}
-
-	transport := &http.Transport{
-		// Connection pooling - aggressive settings for CDN downloads
-		MaxIdleConns:        200,
-		MaxIdleConnsPerHost: 100,
-		MaxConnsPerHost:     100,
-		IdleConnTimeout:     90 * time.Second,
-
-		// Timeouts
-		TLSHandshakeTimeout:   10 * time.Second,
-		ResponseHeaderTimeout: 30 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-
-		// Disable compression - segments are already compressed
-		DisableCompression: true,
-
-		// Enable HTTP/2 for multiplexing
-		ForceAttemptHTTP2: true,
-
-		DialContext: dialer.DialContext,
-
-		TLSClientConfig: &tls.Config{
-			MinVersion: tls.VersionTLS12,
-		},
-	}
-
-	return &http.Client{
-		Transport: transport,
-		Timeout:   0, // No overall timeout; handled per-request
-	}
-}
-
 // SelectTracks selects tracks from manifest and stores them.
 func (e *Engine) SelectTracks(manifest *models.Manifest) error {
 	selected, err := SelectTracks(manifest.Tracks, e.cfg.TrackSelector)
 	if err != nil {
 		return err
+	}
+
+	// Set up decryptors for encrypted tracks
+	for _, track := range selected {
+		// CENC decryptor (DASH) - uses provided key
+		if len(e.cfg.DecryptionKeys) != 0 {
+			for _, kidkey := range e.cfg.DecryptionKeys {
+				if strings.Contains(kidkey, track.KeyID) {
+					dec, _ := decryptor.New(kidkey)
+					track.Decryptor = dec
+				}
+			}
+		}
+
+		// HLS AES-128 decryptor - key fetched from URI
+		if track.EncryptionURI != "" && track.Decryptor == nil {
+			track.HLSDecryptor = decryptor.NewHLSDecryptor(e.client, e.cfg.Headers)
+		}
 	}
 	e.SelectedTracks = selected
 	return nil
@@ -138,43 +118,132 @@ func (e *Engine) Download(ctx context.Context, manifest *models.Manifest) error 
 		}
 	}
 
+	// Set up temp directory and checkpoint for resume support
+	outputPath := filepath.Join(e.cfg.OutputDir, e.cfg.FileName)
+	e.checkpointPath = CheckpointPath(outputPath)
+	tempDir := filepath.Join(os.TempDir(), fmt.Sprintf("veld_%d", os.Getpid()))
+
+	// Try to load existing checkpoint for resume
+	existingCP, _ := LoadCheckpoint(e.checkpointPath)
+	if existingCP != nil && existingCP.Matches(e.cfg.URL) {
+		// Resume from existing checkpoint
+		tempDir = existingCP.TempDir
+		e.checkpoint = existingCP
+		if e.cfg.Verbose {
+			fmt.Printf("Resuming download from checkpoint\n")
+		}
+	} else {
+		// Create new checkpoint
+		if err := os.MkdirAll(tempDir, 0755); err != nil {
+			return fmt.Errorf("create temp dir: %w", err)
+		}
+		e.checkpoint = NewCheckpoint(e.cfg.URL, tempDir)
+	}
+
+	e.pool.SetTempDir(tempDir)
+
+	// Set up checkpoint callback
+	e.pool.SetOnSegmentDone(func(trackID string, index int) {
+		e.checkpoint.MarkDone(trackID, index)
+	})
+
 	// Start worker pool
 	e.pool.Start(ctx)
 	defer e.pool.Stop()
 
-	// Queue all media segments
+	// CENC decryption function (for DASH)
+	cencDecFunc := func(track *models.Track, segment *models.Segment) error {
+		// Combine init + segment
+		combined := make([]byte, len(track.InitSegment.Data)+len(segment.Data))
+		copy(combined, track.InitSegment.Data)
+		copy(combined[len(track.InitSegment.Data):], segment.Data)
+		decrypted, err := track.Decryptor.Decrypt(combined)
+		if err != nil {
+			return err
+		}
+		segment.Data = decrypted
+		return nil
+	}
+
+	// HLS AES-128 decryption function
+	hlsDecFunc := func(track *models.Track, segment *models.Segment) error {
+		// Fetch key (cached after first fetch)
+		key, err := track.HLSDecryptor.FetchKey(ctx, track.EncryptionURI)
+		if err != nil {
+			return fmt.Errorf("fetch key: %w", err)
+		}
+
+		// Use segment index as IV if none specified
+		iv := track.EncryptionIV
+		if len(iv) == 0 {
+			iv = decryptor.SegmentIV(segment.Index)
+		}
+
+		decrypted, err := track.HLSDecryptor.Decrypt(segment.Data, key, iv)
+		if err != nil {
+			return fmt.Errorf("decrypt: %w", err)
+		}
+		segment.Data = decrypted
+		return nil
+	}
+
+	// Queue media segments (skip already completed ones for resume)
+	totalSegments := 0
+	skippedSegments := 0
 	for _, track := range e.SelectedTracks {
 		for _, segment := range track.Segments {
+			totalSegments++
+
+			// Skip if already downloaded (resume)
+			if e.checkpoint.IsSegmentDone(track.ID, segment.Index) {
+				segment.FilePath = e.checkpoint.SegmentPath(track.ID, segment.Index)
+				skippedSegments++
+				continue
+			}
+
 			task := &SegmentTask{
 				Segment: segment,
 				Track:   track,
 				Headers: e.cfg.Headers,
 			}
+			// Set appropriate decryption function
+			if track.Decryptor != nil {
+				task.DecFunc = cencDecFunc
+			} else if track.HLSDecryptor != nil {
+				task.DecFunc = hlsDecFunc
+			}
 			e.pool.Submit(task)
 		}
 	}
 
+	if e.cfg.Verbose && skippedSegments > 0 {
+		fmt.Printf("Resuming: skipped %d/%d segments\n", skippedSegments, totalSegments)
+	}
+
 	// Wait for completion
 	if err := e.pool.Wait(); err != nil {
+		// Save checkpoint for future resume
+		e.checkpoint.Save(e.checkpointPath)
 		return err
 	}
 
-	// Decrypt segments if needed
-	if e.decryptor != nil {
-		for _, track := range e.SelectedTracks {
-			if err := e.decryptTrack(track); err != nil {
-				return err
-			}
-		}
+	// Success: clean up checkpoint and temp files after muxing
+	defer func() {
+		os.Remove(e.checkpointPath)
+		os.RemoveAll(tempDir)
+	}()
+
+	if _, err := os.Stat(e.cfg.OutputDir); os.IsNotExist(err) {
+		os.MkdirAll(e.cfg.OutputDir, 0644)
 	}
 
 	// Mux tracks into final output
-	return e.muxer.Mux(ctx, e.SelectedTracks, e.cfg.OutputPath, ContainerFormat(e.cfg.Format))
+	return e.muxer.Mux(ctx, e.SelectedTracks, filepath.Join(e.cfg.OutputDir, e.cfg.FileName), ContainerFormat(e.cfg.Format))
 }
 
 // decryptTrack decrypts all segments in a track.
 func (e *Engine) decryptTrack(track *models.Track) error {
-	if e.decryptor == nil {
+	if track.Decryptor == nil {
 		return nil
 	}
 
@@ -183,7 +252,7 @@ func (e *Engine) decryptTrack(track *models.Track) error {
 		combined := make([]byte, len(track.InitSegment.Data)+len(segment.Data))
 		copy(combined, track.InitSegment.Data)
 		copy(combined[len(track.InitSegment.Data):], segment.Data)
-		decrypted, err := e.decryptor.Decrypt(combined)
+		decrypted, err := track.Decryptor.Decrypt(combined)
 		if err != nil {
 			return err
 		}

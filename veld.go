@@ -76,9 +76,16 @@ func WithURL(url string) Option {
 }
 
 // WithOutput sets the output file path.
-func WithOutput(path string) Option {
+func WithFileName(filename string) Option {
 	return func(c *config.Config) {
-		c.OutputPath = path
+		c.FileName = filename
+	}
+}
+
+// WithDir sets the directory path.
+func WithDir(dir string) Option {
+	return func(c *config.Config) {
+		c.OutputDir = dir
 	}
 }
 
@@ -128,9 +135,9 @@ func WithTrackSelector(selector string) Option {
 }
 
 // WithDecryptionKey sets the decryption key in "KID:KEY" format (32 hex chars each).
-func WithDecryptionKey(key string) Option {
+func WithDecryptionKeys(keys []string) Option {
 	return func(c *config.Config) {
-		c.DecryptionKey = key
+		c.DecryptionKeys = keys
 	}
 }
 
@@ -145,6 +152,14 @@ func WithVerbose(verbose bool) Option {
 func WithParallelTracks(parallel bool) Option {
 	return func(c *config.Config) {
 		c.ParallelTracks = parallel
+	}
+}
+
+// WithMaxBandwidth sets maximum download speed in bytes per second.
+// Set to 0 for unlimited (default).
+func WithMaxBandwidth(bytesPerSec int64) Option {
+	return func(c *config.Config) {
+		c.MaxBandwidth = bytesPerSec
 	}
 }
 
@@ -256,10 +271,10 @@ func (d *Downloader) ManifestType() string {
 // DownloadURL is a convenience function for simple downloads.
 // It parses the manifest, selects tracks (using "best" or configured selector),
 // and downloads to the specified output path.
-func DownloadURL(ctx context.Context, url, output string, opts ...Option) error {
+func DownloadURL(ctx context.Context, url, filename string, opts ...Option) error {
 	allOpts := append([]Option{
 		WithURL(url),
-		WithOutput(output),
+		WithFileName(filename),
 		WithTrackSelector("best"),
 	}, opts...)
 

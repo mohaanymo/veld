@@ -19,8 +19,9 @@ type Config struct {
 	URL string
 
 	// Output
-	OutputPath string
-	Format     string // mp4, mkv, ts
+	FileName  string
+	OutputDir string
+	Format    string // mp4, mkv, ts
 
 	// Download settings
 	Threads        int
@@ -28,13 +29,14 @@ type Config struct {
 	RetryAttempts  int
 	RetryDelay     time.Duration
 	Timeout        time.Duration
+	MaxBandwidth   int64 // bytes per second, 0 = unlimited
 
 	// HTTP settings
 	Headers map[string]string
 	Cookies string
 
 	// Encryption
-	DecryptionKey string
+	DecryptionKeys []string
 
 	// Track selection
 	TrackSelector string
