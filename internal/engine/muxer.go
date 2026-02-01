@@ -203,13 +203,25 @@ func (m *AutoMuxer) concatSegments(track *models.Track, outputPath string) error
 
 	// Write media segments in order
 	for i, seg := range track.Segments {
-		if len(seg.Data) == 0 {
+		var data []byte
+
+		// Read from disk if FilePath is set, otherwise use in-memory data
+		if seg.FilePath != "" {
+			data, err = os.ReadFile(seg.FilePath)
+			if err != nil {
+				return fmt.Errorf("read segment %d from disk: %w", i, err)
+			}
+		} else {
+			data = seg.Data
+		}
+
+		if len(data) == 0 {
 			if m.verbose {
 				fmt.Printf("  Warning: segment %d has no data\n", i)
 			}
 			continue
 		}
-		n, err := f.Write(seg.Data)
+		n, err := f.Write(data)
 		if err != nil {
 			return fmt.Errorf("write segment %d: %w", i, err)
 		}

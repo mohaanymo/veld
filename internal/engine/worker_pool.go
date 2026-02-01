@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -17,6 +19,7 @@ type SegmentTask struct {
 	Segment *models.Segment
 	Track   *models.Track
 	Headers map[string]string
+	DecFunc func(track *models.Track, segment *models.Segment) error
 }
 
 // WorkerPool manages concurrent segment downloads.
@@ -24,11 +27,12 @@ type WorkerPool struct {
 	workers    int
 	client     *http.Client
 	progressCh chan<- ProgressUpdate
+	tempDir    string // Directory for storing segments on disk
 
-	taskQueue  chan *SegmentTask
-	wg         sync.WaitGroup
-	ctx        context.Context
-	cancel     context.CancelFunc
+	taskQueue chan *SegmentTask
+	wg        sync.WaitGroup
+	ctx       context.Context
+	cancel    context.CancelFunc
 
 	// Stats
 	completed  atomic.Int64
@@ -39,8 +43,9 @@ type WorkerPool struct {
 	errorsMu   sync.Mutex
 
 	// Config
-	maxRetries int
-	verbose    bool
+	maxRetries    int
+	verbose       bool
+	onSegmentDone func(trackID string, index int) // Called after successful download
 }
 
 // NewWorkerPool creates a new worker pool.
@@ -54,9 +59,19 @@ func NewWorkerPool(workers int, client *http.Client, progressCh chan<- ProgressU
 	}
 }
 
+// SetTempDir sets the directory for storing downloaded segments.
+func (p *WorkerPool) SetTempDir(dir string) {
+	p.tempDir = dir
+}
+
 // SetVerbose enables verbose error logging.
 func (p *WorkerPool) SetVerbose(v bool) {
 	p.verbose = v
+}
+
+// SetOnSegmentDone sets a callback for successful segment downloads.
+func (p *WorkerPool) SetOnSegmentDone(fn func(trackID string, index int)) {
+	p.onSegmentDone = fn
 }
 
 // Start launches the worker goroutines.
@@ -105,11 +120,39 @@ func (p *WorkerPool) downloadSegment(task *SegmentTask) {
 
 		data, err := p.doRequest(task)
 		if err == nil {
-			task.Segment.Data = data
 			task.Segment.Size = int64(len(data))
+
+			// Run decryption if needed (on in-memory data)
+			if task.DecFunc != nil {
+				task.Segment.Data = data
+				if err = task.DecFunc(task.Track, task.Segment); err != nil {
+					lastErr = err
+					continue
+				}
+				data = task.Segment.Data // Use decrypted data
+			}
+
+			// Write to disk if tempDir is set
+			if p.tempDir != "" {
+				segPath := filepath.Join(p.tempDir, fmt.Sprintf("%s_%05d.seg", task.Track.ID, task.Segment.Index))
+				if err = os.WriteFile(segPath, data, 0644); err != nil {
+					lastErr = fmt.Errorf("write segment: %w", err)
+					continue
+				}
+				task.Segment.FilePath = segPath
+				task.Segment.Data = nil // Release memory
+			} else {
+				task.Segment.Data = data
+			}
+
 			p.completed.Add(1)
 			p.totalBytes.Add(task.Segment.Size)
 			p.sendProgress(task, task.Segment.Size, nil)
+
+			// Notify checkpoint of successful download
+			if p.onSegmentDone != nil {
+				p.onSegmentDone(task.Track.ID, task.Segment.Index)
+			}
 			return
 		}
 

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/mohaanymo/veld/internal/decryptor"
 )
 
 // ManifestType represents the type of streaming manifest.
@@ -72,6 +74,8 @@ type Track struct {
 	MediaPlaylistURL string
 
 	// Encryption info
+	Decryptor     *decryptor.Decryptor    // For CENC (DASH)
+	HLSDecryptor  *decryptor.HLSDecryptor // For AES-128 (HLS)
 	Encrypted     bool
 	EncryptionURI string
 	EncryptionIV  []byte
@@ -147,7 +151,8 @@ type Segment struct {
 	Duration  time.Duration
 	Size      int64
 	ByteRange *ByteRange
-	Data      []byte
+	Data      []byte // In-memory data (deprecated, use FilePath)
+	FilePath  string // Path to segment file on disk
 }
 
 // ByteRange represents HTTP Range request parameters.
